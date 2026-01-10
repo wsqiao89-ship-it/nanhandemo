@@ -1,0 +1,5 @@
+{
+  "name": "OrderFlow OMS",
+  "description": "A comprehensive Order Management System demo featuring tracking, vehicle management, and complex status workflows.",
+  "requestFramePermissions": []
+}

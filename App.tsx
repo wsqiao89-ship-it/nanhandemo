@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Truck, RotateCcw, RefreshCw, DollarSign, Edit, Filter, FileCheck, LayoutDashboard, ClipboardList, Menu, CheckCircle, XCircle, Clock, ChevronRight, FileText, Banknote, ScrollText, QrCode, Archive, Box, Home, TrendingUp, Download, RefreshCcw, Layers, ShoppingBag, Smartphone, Clipboard } from 'lucide-react';
+import { Search, Plus, Truck, RotateCcw, RefreshCw, DollarSign, Edit, Filter, FileCheck, LayoutDashboard, ClipboardList, Menu, CheckCircle, XCircle, Clock, ChevronRight, FileText, Banknote, ScrollText, QrCode, Archive, Box, Home, TrendingUp, Download, RefreshCcw, Layers, ShoppingBag, Smartphone, Clipboard, Barcode } from 'lucide-react';
 import { MOCK_ORDERS, MOCK_CONTRACTS, MOCK_WAREHOUSES } from './constants';
 import { Order, OrderStatus, FilterState, Contract, RecordType, VehicleStatus, StockRecord } from './types';
 import { StatusBadge } from './components/StatusBadge';
@@ -9,6 +9,7 @@ import { OrderDetails } from './components/OrderDetails';
 import { PriceManagement } from './components/PriceManagement';
 import { ContractManagement } from './components/ContractManagement';
 import { CodingManagement } from './components/CodingManagement';
+import { ProductionCodeManagement } from './components/ProductionCodeManagement';
 import { WarehouseManagement } from './components/WarehouseManagement';
 import { WarehouseOverview } from './components/WarehouseOverview';
 import { WarehouseOperations } from './components/WarehouseOperations';
@@ -18,7 +19,7 @@ import { AppSimulation } from './components/AppSimulation';
 
 export default function App() {
   const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
-  const [currentView, setCurrentView] = useState<'dashboard' | 'orders' | 'purchase_orders' | 'approvals' | 'prices' | 'contracts' | 'coding' | 'warehouse_mgt' | 'warehouse_view' | 'warehouse_ops' | 'statistics' | 'app_simulation'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'orders' | 'purchase_orders' | 'approvals' | 'prices' | 'contracts' | 'coding' | 'production_codes' | 'warehouse_mgt' | 'warehouse_view' | 'warehouse_ops' | 'statistics' | 'app_simulation'>('dashboard');
   
   // Shared Production/Stock Records State
   const [productionRecords, setProductionRecords] = useState<StockRecord[]>([]);
@@ -230,7 +231,7 @@ export default function App() {
             <div className="bg-blue-600 p-1.5 rounded-lg text-white shadow-lg shadow-blue-900/50">
               <Truck size={20} />
             </div>
-            <h1 className="text-lg font-bold tracking-wide text-gray-100">OrderFlow</h1>
+            <h1 className="text-lg font-bold tracking-wide text-gray-100">南韩化工厂</h1>
          </div>
          
          <nav className="flex-1 py-6 px-3 space-y-1.5">
@@ -312,11 +313,19 @@ export default function App() {
             </button>
 
             <button 
+              onClick={() => setCurrentView('production_codes')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 group ${currentView === 'production_codes' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            >
+               <Barcode size={20} className={currentView === 'production_codes' ? 'text-white' : 'text-slate-500 group-hover:text-white'} />
+               生产编码
+            </button>
+
+            <button 
               onClick={() => setCurrentView('coding')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 group ${currentView === 'coding' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
             >
                <QrCode size={20} className={currentView === 'coding' ? 'text-white' : 'text-slate-500 group-hover:text-white'} />
-               编码管理
+               编码规则
             </button>
 
             <div className="px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 mt-6">财务与审批</div>
@@ -369,7 +378,7 @@ export default function App() {
         <header className="bg-white shadow-sm border-b border-gray-200 md:hidden h-16 flex items-center px-4 justify-between sticky top-0 z-20">
            <div className="flex items-center gap-2">
               <Truck className="text-blue-600" />
-              <span className="font-bold">OrderFlow OMS</span>
+              <span className="font-bold">南韩化工厂</span>
            </div>
            <Menu className="text-gray-500" />
         </header>
@@ -398,9 +407,14 @@ export default function App() {
              <ContractManagement onGenerateOrder={handleGenerateOrder} />
            )}
 
-            {/* VIEW: CODING MANAGEMENT */}
+            {/* VIEW: CODING RULES */}
             {currentView === 'coding' && (
              <CodingManagement />
+           )}
+
+           {/* VIEW: PRODUCTION CODES */}
+           {currentView === 'production_codes' && (
+             <ProductionCodeManagement />
            )}
 
            {/* VIEW: WAREHOUSE MANAGEMENT */}

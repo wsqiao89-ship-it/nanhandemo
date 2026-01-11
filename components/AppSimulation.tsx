@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
-import { ChevronLeft, Menu, Camera, PenTool, CheckCircle, AlertTriangle, Clock, Save, User, Truck, FileText, Shield, Factory, Calendar, Layers, ChevronRight, Search, Edit, Trash2, X, FileCheck, DollarSign, PieChart, TrendingUp } from 'lucide-react';
+import { ChevronLeft, Menu, Camera, PenTool, CheckCircle, AlertTriangle, Clock, Save, User, Truck, FileText, Shield, Factory, Calendar, Layers, ChevronRight, Search, Edit, Trash2, X, FileCheck, DollarSign, PieChart, TrendingUp, ScanLine, Box, ArrowDownCircle, ArrowUpCircle, RefreshCw, ClipboardCheck, List } from 'lucide-react';
 import { StockRecord, Order, OrderStatus } from '../types';
-import { MOCK_ORDERS } from '../constants'; // Import MOCK_ORDERS for stats
+import { MOCK_ORDERS, MOCK_WAREHOUSES } from '../constants';
 
 interface AppSimulationProps {
   onSaveProduction?: (records: StockRecord[]) => void;
@@ -100,7 +100,7 @@ const MOCK_SUBMISSIONS: SubmissionData[] = [
 ];
 
 export const AppSimulation: React.FC<AppSimulationProps> = ({ onSaveProduction, pendingTasks = [], onApprove, onReject }) => {
-  const [view, setView] = useState<'home' | 'driver' | 'staff-list' | 'staff-detail' | 'production' | 'todo-list' | 'stats'>('home');
+  const [view, setView] = useState<'home' | 'driver' | 'staff-list' | 'staff-detail' | 'production' | 'todo-list' | 'stats' | 'pda'>('home');
   
   // List of submissions waiting for verification
   const [submissions, setSubmissions] = useState<SubmissionData[]>(MOCK_SUBMISSIONS);
@@ -270,8 +270,8 @@ export const AppSimulation: React.FC<AppSimulationProps> = ({ onSaveProduction, 
           <div className="bg-blue-600 h-48 rounded-b-[3rem] relative flex items-center justify-center shadow-lg">
               <div className="text-center text-white">
                   <Truck size={48} className="mx-auto mb-2 opacity-90"/>
-                  <h1 className="text-2xl font-bold">数字化工厂</h1>
-                  <p className="text-blue-100 text-sm">Digital Factory App</p>
+                  <h1 className="text-2xl font-bold">南韩化工厂</h1>
+                  <p className="text-blue-100 text-sm">Nanhan Chemical App</p>
               </div>
           </div>
           
@@ -292,15 +292,27 @@ export const AppSimulation: React.FC<AppSimulationProps> = ({ onSaveProduction, 
                   )}
               </button>
 
-              <button onClick={() => setView('stats')} className="w-full bg-white p-5 rounded-xl shadow-sm flex items-center gap-4 hover:shadow-md transition-all border border-gray-100">
-                  <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
-                      <PieChart size={24} />
-                  </div>
-                  <div className="text-left">
-                      <h3 className="font-bold text-gray-800 text-lg">统计分析</h3>
-                      <p className="text-gray-500 text-sm">查看经营数据日报</p>
-                  </div>
-              </button>
+              <div className="grid grid-cols-2 gap-4">
+                <button onClick={() => setView('pda')} className="bg-white p-4 rounded-xl shadow-sm flex flex-col items-center justify-center gap-2 hover:shadow-md transition-all border border-gray-100 h-32">
+                    <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-white shadow-md">
+                        <ScanLine size={20} />
+                    </div>
+                    <div className="text-center">
+                        <h3 className="font-bold text-gray-800 text-sm">智能仓储 PDA</h3>
+                        <p className="text-gray-400 text-[10px]">扫码/库存/盘点</p>
+                    </div>
+                </button>
+
+                <button onClick={() => setView('stats')} className="bg-white p-4 rounded-xl shadow-sm flex flex-col items-center justify-center gap-2 hover:shadow-md transition-all border border-gray-100 h-32">
+                    <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
+                        <PieChart size={20} />
+                    </div>
+                    <div className="text-center">
+                        <h3 className="font-bold text-gray-800 text-sm">统计分析</h3>
+                        <p className="text-gray-400 text-[10px]">经营数据日报</p>
+                    </div>
+                </button>
+              </div>
 
               <button onClick={() => { setFormData(INITIAL_FORM_DATA); setView('driver'); }} className="w-full bg-white p-5 rounded-xl shadow-sm flex items-center gap-4 hover:shadow-md transition-all border border-gray-100">
                   <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
@@ -334,6 +346,137 @@ export const AppSimulation: React.FC<AppSimulationProps> = ({ onSaveProduction, 
           </div>
       </div>
   );
+
+  const PDAView = () => {
+      const [tab, setTab] = useState<'ops' | 'inv' | 'rec'>('ops');
+
+      const mockRecords = [
+          { id: 1, type: 'in', time: '10:30', product: '湿法氟化铝', qty: 32, loc: '1号库-A区' },
+          { id: 2, type: 'out', time: '09:15', product: '萤石', qty: 15, loc: '1号库-B区' },
+          { id: 3, type: 'transfer', time: '08:45', product: '硫酸', qty: 5, loc: 'B区 -> C区' },
+          { id: 4, type: 'in', time: 'Yesterday', product: '包装袋', qty: 500, loc: '辅料库' },
+      ];
+
+      return (
+        <div className="h-full bg-gray-50 flex flex-col">
+            <div className="bg-slate-800 text-white px-4 py-3 flex items-center gap-3 shadow-md sticky top-0 z-10">
+                <button onClick={() => setView('home')}><ChevronLeft /></button>
+                <h2 className="font-bold text-lg">智能仓储 PDA</h2>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+                {tab === 'ops' && (
+                    <div className="grid grid-cols-2 gap-4">
+                        <button className="bg-white p-6 rounded-xl shadow-sm flex flex-col items-center justify-center gap-3 active:bg-blue-50 border border-gray-100 h-40">
+                            <div className="w-14 h-14 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                                <ArrowDownCircle size={32} />
+                            </div>
+                            <span className="font-bold text-gray-700">扫码入库</span>
+                        </button>
+                        <button className="bg-white p-6 rounded-xl shadow-sm flex flex-col items-center justify-center gap-3 active:bg-blue-50 border border-gray-100 h-40">
+                            <div className="w-14 h-14 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center">
+                                <ArrowUpCircle size={32} />
+                            </div>
+                            <span className="font-bold text-gray-700">扫码出库</span>
+                        </button>
+                        <button className="bg-white p-6 rounded-xl shadow-sm flex flex-col items-center justify-center gap-3 active:bg-blue-50 border border-gray-100 h-40">
+                            <div className="w-14 h-14 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                                <RefreshCw size={32} />
+                            </div>
+                            <span className="font-bold text-gray-700">移库调拨</span>
+                        </button>
+                        <button className="bg-white p-6 rounded-xl shadow-sm flex flex-col items-center justify-center gap-3 active:bg-blue-50 border border-gray-100 h-40">
+                            <div className="w-14 h-14 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
+                                <ClipboardCheck size={32} />
+                            </div>
+                            <span className="font-bold text-gray-700">库存盘点</span>
+                        </button>
+                    </div>
+                )}
+
+                {tab === 'inv' && (
+                    <div className="space-y-4">
+                        {MOCK_WAREHOUSES.map(wh => (
+                            <div key={wh.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                                <div className="bg-gray-50 px-4 py-2 border-b flex justify-between items-center">
+                                    <div className="font-bold text-gray-800 flex items-center gap-2">
+                                        <Box size={16} className="text-slate-500"/> {wh.name}
+                                    </div>
+                                    <span className="text-xs bg-white border px-2 py-0.5 rounded text-gray-500">{wh.type}</span>
+                                </div>
+                                <div className="divide-y">
+                                    {wh.zones.map(z => (
+                                        <div key={z.id} className="p-3 flex justify-between items-center text-sm">
+                                            <span className="text-gray-600 font-medium">{z.name}</span>
+                                            <div className="text-right">
+                                                {z.inventory.length > 0 ? (
+                                                    <div className="flex flex-col items-end">
+                                                        {z.inventory.map(i => (
+                                                            <div key={i.id}>
+                                                                <span className="font-bold text-slate-700">{i.productName}: </span>
+                                                                <span className="text-blue-600">{i.quantity}{i.unit}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : <span className="text-gray-300 text-xs">空闲</span>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {tab === 'rec' && (
+                    <div className="space-y-3">
+                        {mockRecords.map(r => (
+                            <div key={r.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${
+                                        r.type === 'in' ? 'bg-green-500' : r.type === 'out' ? 'bg-orange-500' : 'bg-blue-500'
+                                    }`}>
+                                        {r.type === 'in' ? <ArrowDownCircle size={18}/> : r.type === 'out' ? <ArrowUpCircle size={18}/> : <RefreshCw size={18}/>}
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-gray-800">{r.product} <span className="text-gray-400 font-normal">| {r.qty}吨</span></div>
+                                        <div className="text-xs text-gray-500">{r.loc}</div>
+                                    </div>
+                                </div>
+                                <div className="text-xs text-gray-400 font-mono">{r.time}</div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="bg-white border-t border-gray-200 flex justify-around p-1 pb-3">
+                <button 
+                    onClick={() => setTab('ops')} 
+                    className={`flex flex-col items-center justify-center p-2 rounded-lg w-full transition-colors ${tab === 'ops' ? 'text-slate-800' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    <ScanLine size={24} className={tab === 'ops' ? 'fill-current opacity-20' : ''}/>
+                    <span className="text-[10px] font-bold mt-1">作业</span>
+                </button>
+                <button 
+                    onClick={() => setTab('inv')} 
+                    className={`flex flex-col items-center justify-center p-2 rounded-lg w-full transition-colors ${tab === 'inv' ? 'text-slate-800' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    <Box size={24} className={tab === 'inv' ? 'fill-current opacity-20' : ''}/>
+                    <span className="text-[10px] font-bold mt-1">库存</span>
+                </button>
+                <button 
+                    onClick={() => setTab('rec')} 
+                    className={`flex flex-col items-center justify-center p-2 rounded-lg w-full transition-colors ${tab === 'rec' ? 'text-slate-800' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    <List size={24} className={tab === 'rec' ? 'fill-current opacity-20' : ''}/>
+                    <span className="text-[10px] font-bold mt-1">记录</span>
+                </button>
+            </div>
+        </div>
+      );
+  };
 
   const StatisticsView = () => {
       // Calculate Stats on the fly from MOCK_ORDERS
@@ -739,6 +882,7 @@ export const AppSimulation: React.FC<AppSimulationProps> = ({ onSaveProduction, 
                 {view === 'staff-list' && <StaffListView />}
                 {view === 'staff-detail' && <StaffDetailView />}
                 {view === 'production' && <ProductionView />}
+                {view === 'pda' && <PDAView />}
             </div>
 
             {/* Home Indicator */}
@@ -753,6 +897,7 @@ export const AppSimulation: React.FC<AppSimulationProps> = ({ onSaveProduction, 
             </p>
             <ul className="list-disc pl-5 space-y-2 text-sm text-gray-500">
                 <li><span className="font-bold text-red-600">我的待办:</span> 随时随地处理审批任务（如财务审核、价格审批），数据与PC端实时同步。</li>
+                <li><span className="font-bold text-slate-800">智能仓储 PDA:</span> 手持终端模式，支持扫码出入库、库内移位及库存盘点。</li>
                 <li><span className="font-bold text-indigo-600">统计分析:</span> 查看企业经营数据日报、销售趋势及业绩排行。</li>
                 <li><span className="font-bold text-blue-600">驾驶员填报:</span> 司机入厂前或排队时填写详细的车辆、人员及货物资质信息。</li>
                 <li><span className="font-bold text-green-600">卸货查验核准:</span> 现场人员先选择车辆，再核对信息，进行卸车安全检查。</li>

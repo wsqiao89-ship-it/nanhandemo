@@ -1,5 +1,5 @@
 
-import { Order, OrderStatus, VehicleStatus, RecordType, VehicleMaster, Contract, ContractStatus, ContractType, Warehouse, WarehouseType, ProductCodeRule } from './types';
+import { Order, OrderStatus, VehicleStatus, RecordType, VehicleMaster, Contract, ContractStatus, ContractType, Warehouse, WarehouseType, ProductCodeRule, ProductionCode } from './types';
 
 const generateHistory = (status: string) => [
   { date: '2023-10-20 09:00', action: '创建订单', user: '销售部-李经理' },
@@ -391,6 +391,78 @@ export const MOCK_WAREHOUSES: Warehouse[] = [
       },
       { id: 'z3-2', name: 'F-02', inventory: [] },
       { id: 'z3-3', name: 'F-03', inventory: [] }
+    ]
+  }
+];
+
+export const MOCK_PRODUCTION_CODES: ProductionCode[] = [
+  {
+    id: 'pc-1',
+    code: 'FHL-20231027-0001',
+    productName: '湿法氟化铝',
+    spec: 'AF-1',
+    type: 'finished',
+    batchNo: 'BATCH-20231027',
+    createTime: '2023-10-27 08:30',
+    status: 'in_stock',
+    currentQty: 1200,
+    unit: '吨',
+    location: '成品发货仓 - F-01',
+    history: [
+      { date: '2023-10-27 08:30', action: 'create', desc: '产线生产下线', operator: '班组A' },
+      { date: '2023-10-27 09:00', action: 'in', desc: '入库至 F-01', location: '成品发货仓 - F-01', operator: '仓管员' }
+    ]
+  },
+  {
+    id: 'pc-2',
+    code: 'FHL-20231027-0002',
+    productName: '湿法氟化铝',
+    spec: 'AF-1',
+    type: 'finished',
+    batchNo: 'BATCH-20231027',
+    createTime: '2023-10-27 10:30',
+    status: 'shipped',
+    currentQty: 0,
+    unit: '吨',
+    location: '-',
+    history: [
+      { date: '2023-10-27 10:30', action: 'create', desc: '产线生产下线', operator: '班组A' },
+      { date: '2023-10-27 11:00', action: 'in', desc: '入库至 F-01', location: '成品发货仓 - F-01', operator: '仓管员' },
+      { date: '2023-10-27 14:00', action: 'out', desc: '销售出库', truckPlate: '鲁C88888', operator: '发货员' }
+    ]
+  },
+  {
+    id: 'pc-3',
+    code: 'SEMI-20231028-005',
+    productName: '氢氧化铝半成品',
+    spec: '原料级',
+    type: 'semi',
+    batchNo: 'BATCH-SEMI-005',
+    createTime: '2023-10-28 09:00',
+    status: 'in_stock',
+    currentQty: 50,
+    unit: '吨',
+    location: '半成品暂存库 - S-01',
+    history: [
+      { date: '2023-10-28 09:00', action: 'create', desc: '原料加工完成', operator: '车间B' },
+      { date: '2023-10-28 09:15', action: 'in', desc: '入库暂存', location: '半成品暂存库 - S-01', operator: '仓管员' }
+    ]
+  },
+  {
+    id: 'pc-4',
+    code: 'FHL-20231026-9999',
+    productName: '湿法氟化铝',
+    spec: 'AF-1',
+    type: 'finished',
+    batchNo: 'BATCH-20231026',
+    createTime: '2023-10-26 16:00',
+    status: 'consumed',
+    currentQty: 0,
+    unit: '吨',
+    location: '-',
+    history: [
+      { date: '2023-10-26 16:00', action: 'create', desc: '产线生产下线', operator: '班组C' },
+      { date: '2023-10-26 16:30', action: 'out', desc: '内部领用消耗', operator: '领料员' }
     ]
   }
 ];

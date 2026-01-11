@@ -176,3 +176,31 @@ export interface StockRecord {
   plate?: string;
   materialType?: 'finished' | 'semi';
 }
+
+// --- Production Coding ---
+export interface CodeHistory {
+  date: string;
+  action: 'create' | 'in' | 'out' | 'transfer' | 'adjust';
+  desc: string; // e.g. "Created by Production Line 1"
+  truckPlate?: string; // If shipped
+  location?: string; // e.g. "Warehouse 1 - Zone A"
+  operator?: string;
+}
+
+export interface ProductionCode {
+  id: string;
+  code: string; // The unique barcode string
+  productName: string;
+  spec: string;
+  type: 'finished' | 'semi'; // 成品 vs 半成品
+  batchNo: string;
+  createTime: string;
+  
+  // Current State
+  status: 'in_stock' | 'shipped' | 'consumed' | 'deleted';
+  currentQty: number;
+  unit: string;
+  location: string; // Warehouse Name + Zone Name
+  
+  history: CodeHistory[];
+}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Truck, User, Plus, Search, Trash2, Edit2, CheckCircle, Save, AlertCircle, Clock, FileCheck, ChevronDown, ChevronUp, Scale, LogIn, LogOut, PackageCheck } from 'lucide-react';
-import { MOCK_VEHICLE_POOL } from '../constants';
-import { Order, OrderStatus, VehicleMaster, RecordType, VehicleRecord, VehicleStatus } from '../types';
+import { X, Truck, User, Plus, Search, Trash2, Edit2, CheckCircle, Save, AlertCircle, Clock, FileCheck, ChevronDown, ChevronUp, Scale, LogIn, LogOut, PackageCheck, Box } from 'lucide-react';
+import { MOCK_VEHICLE_POOL, MOCK_WAREHOUSES } from '../constants';
+import { Order, OrderStatus, VehicleMaster, RecordType, VehicleRecord, VehicleStatus, Warehouse, WarehouseZone } from '../types';
 import { StatusBadge } from './StatusBadge';
 
 // --- Types ---
@@ -111,7 +111,7 @@ export const PriceModal: React.FC<{ isOpen: boolean; onClose: () => void; order:
   );
 };
 
-// 3. Audit Modal (Simplified since logic is now in main view, but kept for compatibility)
+// 3. Audit Modal
 export const AuditModal: React.FC<{ isOpen: boolean; onClose: () => void; onApprove: () => void; order: Order | null }> = ({ isOpen, onClose, onApprove, order }) => {
   if (!order) return null;
   return (
@@ -184,6 +184,10 @@ const VehicleTimeline: React.FC<{ v: VehicleRecord }> = ({ v }) => {
              <div className="text-center">
                 <div className="font-bold text-gray-700">{v.type === RecordType.Normal ? '装货作业' : '卸货作业'}</div>
                 <div className="text-gray-400 scale-90">作业区</div>
+                {/* Source Info for Timeline */}
+                {v.warehouseName && (
+                   <div className="text-[10px] text-indigo-600 bg-indigo-50 px-1 rounded mt-0.5">{v.warehouseName}</div>
+                )}
              </div>
           </div>
 
@@ -250,23 +254,24 @@ const VehicleRow: React.FC<{
           </div>
         </td>
         
-        {/* New Columns for Data Completeness */}
+        {/* Source / Batch Info Column */}
+        <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+            {v.warehouseName ? (
+                <div className="flex flex-col">
+                    <span className="font-bold text-indigo-700 text-xs flex items-center gap-1"><Box size={10}/> {v.warehouseName}</span>
+                    <span className="text-[10px] text-gray-400 font-mono">{v.batchNumber || '无批号'}</span>
+                </div>
+            ) : <span className="text-gray-300 text-xs">-</span>}
+        </td>
+
         <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
             {v.entryTime ? <span className="font-mono text-xs bg-gray-100 px-1 py-0.5 rounded text-gray-600">{formatTime(v.entryTime)}</span> : <span className="text-gray-300">-</span>}
         </td>
-        <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-            {v.weighing1 ? (
-               <div className="flex flex-col">
-                  <span className="font-bold text-gray-800">{v.weighing1.weight}T</span>
-                  <span className="text-xs text-gray-400 transform scale-90 origin-left">{v.weighing1.time}</span>
-               </div>
-            ) : <span className="text-gray-300">-</span>}
-        </td>
+        
          <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
             {v.weighing2 ? (
                <div className="flex flex-col">
                   <span className="font-bold text-blue-700">{v.weighing2.weight}T</span>
-                  <span className="text-xs text-gray-400 transform scale-90 origin-left">{v.weighing2.time}</span>
                </div>
             ) : <span className="text-gray-300">-</span>}
         </td>
@@ -324,7 +329,7 @@ const VehicleRow: React.FC<{
                   </div>
                 )}
                 
-                {/* The Visual Timeline */}
+                {/* Visual Timeline */}
                 <VehicleTimeline v={v} />
              </div>
           </td>
@@ -352,7 +357,7 @@ export const ActionModal: React.FC<ActionModalProps> = ({ isOpen, onClose, onSav
   const [driverPhone, setDriverPhone] = useState('');
   const [weight, setWeight] = useState('');
   const [commonReason, setCommonReason] = useState('');
-
+  
   const currentRecordType = type === 'ship' ? RecordType.Normal 
                           : type === 'return' ? RecordType.Return 
                           : RecordType.Exchange;
@@ -429,7 +434,7 @@ export const ActionModal: React.FC<ActionModalProps> = ({ isOpen, onClose, onSav
             driverName,
             driverPhone,
             loadWeight: type === 'ship' ? numWeight : v.loadWeight,
-            returnWeight: type !== 'ship' ? numWeight : v.returnWeight
+            returnWeight: type !== 'ship' ? numWeight : v.returnWeight,
           };
         }
         return v;
@@ -443,7 +448,7 @@ export const ActionModal: React.FC<ActionModalProps> = ({ isOpen, onClose, onSav
         status: VehicleStatus.PendingEntry,
         loadWeight: type === 'ship' ? numWeight : 0,
         returnWeight: type !== 'ship' ? numWeight : 0,
-        type: currentRecordType
+        type: currentRecordType,
       };
       setVehicleList(prev => [...prev, newRecord]);
     }
@@ -499,6 +504,7 @@ export const ActionModal: React.FC<ActionModalProps> = ({ isOpen, onClose, onSav
            <div className="bg-gray-50 p-4 rounded border border-gray-200 shadow-sm text-sm">
              <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                <div>订单: <span className="font-bold text-gray-900">{order.id}</span></div>
+               <div className="col-span-2">客户: <span className="font-bold text-indigo-700 text-lg">{order.customerName}</span></div>
                <div>产品: <span className="font-bold text-gray-900">{order.productName}</span></div>
                <div>规格: <span className="font-bold text-gray-900">{order.spec}</span></div>
                <div>剩余: <span className={`font-bold text-${theme}-600`}>{order.quantity} T</span></div>
@@ -538,17 +544,17 @@ export const ActionModal: React.FC<ActionModalProps> = ({ isOpen, onClose, onSav
                   <label className="text-xs text-gray-500">司机</label>
                   <input className="w-full bg-gray-50 border rounded p-2 text-sm" value={driverName} readOnly />
                 </div>
-                <div className="col-span-2">
-                   <label className="text-xs text-gray-500">计划(吨)</label>
+                <div className="col-span-3">
+                   <label className="text-xs text-gray-500">计划重量(T)</label>
                    <input type="number" className="w-full border rounded p-2 text-sm text-center font-bold" value={weight} onChange={e => setWeight(e.target.value)} />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-3">
                    <button 
                      onClick={handleAddOrUpdate}
                      disabled={!selectedPlate || !driverName || !weight}
                      className={`w-full p-2 bg-${theme}-600 text-white rounded hover:bg-${theme}-700 flex justify-center disabled:opacity-50`}
                    >
-                     {editingId ? <CheckCircle size={18} /> : <Plus size={18} />}
+                     {editingId ? <CheckCircle size={18} /> : <Plus size={18} />} {editingId ? '保存修改' : '添加车辆'}
                    </button>
                 </div>
               </div>
@@ -564,8 +570,8 @@ export const ActionModal: React.FC<ActionModalProps> = ({ isOpen, onClose, onSav
                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">状态</th>
                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">车牌</th>
                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">司机</th>
+                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">货源/批次</th>
                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">进厂时间</th>
-                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">一次过磅</th>
                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">二次过磅</th>
                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">出厂时间</th>
                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">重量(吨)</th>

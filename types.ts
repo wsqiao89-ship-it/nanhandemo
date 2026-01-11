@@ -5,7 +5,9 @@ export enum OrderStatus {
   Unassigned = '未分配车辆',
   ReadyToShip = '待发货', // Assigned vehicles
   Shipping = '发货中', // Vehicle entered
+  Receiving = '收货中', // Purchase: Vehicle entered/Unloading
   Completed = '已完成',
+  Stored = '已入库', // Purchase: Completed/Put away
   Returning = '退货中',
   Exchanging = '换货中',
   Returned = '已退货',
@@ -60,6 +62,11 @@ export interface VehicleRecord {
   // Planned/Dispatch Info
   loadWeight: number; // Planned weight
   
+  // Source/Inventory Info (New)
+  warehouseName?: string;
+  zoneName?: string;
+  batchNumber?: string; // Product Code / Batch Barcode
+
   // Tracking Info (Lifecycle Timestamps)
   entryTime?: string;     // 进场时间
   weighing1?: { time: string; weight: number }; // 皮重/第一次过磅
@@ -78,9 +85,11 @@ export interface VehicleRecord {
 
 export interface Order {
   id: string; // Order Number
+  type: 'sales' | 'purchase'; // Sales or Purchase
   contractId: string;
-  customerName: string;
+  customerName: string; // Used as Supplier Name for purchase orders
   productName: string;
+  category: 'main' | 'byproduct'; // Sales: Main/Byproduct
   spec: string;
   quantity: number; // Tons
   unitPrice: number;
@@ -113,6 +122,8 @@ export interface FilterState {
   contractId: string;
   shipDate: string;
   status: OrderStatus | '';
+  plateNumber: string; // New filter
+  productType: string; // New filter
 }
 
 // --- New Types for Modules ---
@@ -153,4 +164,15 @@ export interface Warehouse {
   type: WarehouseType;
   createDate: string;
   zones: WarehouseZone[];
+}
+
+export interface StockRecord {
+  id: string;
+  date: string;
+  type: 'in' | 'out' | 'transfer' | 'adjust';
+  product: string;
+  qty: number;
+  ref: string; // Order ID or Contract ID
+  plate?: string;
+  materialType?: 'finished' | 'semi';
 }

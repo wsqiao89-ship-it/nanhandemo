@@ -26,6 +26,7 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order, isOpen, onClo
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">车牌号 / 司机</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">货源/批次</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">进场时间</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">第一次过磅</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">第二次过磅</th>
@@ -45,6 +46,16 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ order, isOpen, onClo
                   <div className="text-xs text-gray-500">{v.driverName} <span className="text-gray-300">|</span> {v.driverPhone}</div>
                 </td>
                 
+                {/* Source / Batch */}
+                <td className="px-4 py-3 whitespace-nowrap">
+                   {v.warehouseName ? (
+                     <div>
+                       <div className="text-xs font-bold text-indigo-700">{v.warehouseName}</div>
+                       <div className="text-[10px] text-gray-400 font-mono">{v.batchNumber || '-'}</div>
+                     </div>
+                   ) : <span className="text-gray-300">-</span>}
+                </td>
+
                 {/* Entry Time */}
                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                    {v.entryTime ? <span className="font-mono text-xs">{v.entryTime.split(' ')[1]}</span> : '-'}

@@ -8,6 +8,9 @@ export const StatisticsAnalysis: React.FC = () => {
   const [dateRange, setDateRange] = useState({ start: '2023-10-01', end: '2023-10-31' }); // Default to mock data range
   const [trendMode, setTrendMode] = useState<'daily' | 'monthly'>('daily');
 
+  // Helper to normalize quantities to Tons
+  const getTonValue = (val: number, unit?: string) => unit === 'kg' ? val / 1000 : val;
+
   // --- Data Processing ---
   
   const filteredData = useMemo(() => {
@@ -26,7 +29,7 @@ export const StatisticsAnalysis: React.FC = () => {
        return true;
     });
 
-    const totalRevenue = sales.reduce((acc, o) => acc + (o.quantity * o.unitPrice), 0);
+    const totalRevenue = sales.reduce((acc, o) => acc + (getTonValue(o.quantity, o.unit) * o.unitPrice), 0);
     const totalCost = purchases.reduce((acc, c) => acc + (c.amount || 0), 0);
     const grossProfit = totalRevenue - totalCost;
     const margin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
@@ -44,7 +47,8 @@ export const StatisticsAnalysis: React.FC = () => {
           if (trendMode === 'monthly') {
               key = o.shipDate.substring(0, 7); // YYYY-MM
           }
-          const amount = o.quantity * o.unitPrice;
+          // Assuming unitPrice is per Ton, we must use Ton quantity
+          const amount = getTonValue(o.quantity, o.unit) * o.unitPrice;
           data[key] = (data[key] || 0) + amount;
       });
 
@@ -263,7 +267,7 @@ export const StatisticsAnalysis: React.FC = () => {
             <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2"><TrendingUp size={18} className="text-blue-500" /> 产品销售收入排行</h3>
             {(() => {
                const productSales = filteredData.sales.reduce((acc, o) => {
-                  acc[o.productName] = (acc[o.productName] || 0) + (o.quantity * o.unitPrice);
+                  acc[o.productName] = (acc[o.productName] || 0) + (getTonValue(o.quantity, o.unit) * o.unitPrice);
                   return acc;
                }, {} as Record<string, number>);
                const sortedProducts = (Object.entries(productSales) as [string, number][]).sort((a, b) => b[1] - a[1]);
@@ -325,8 +329,8 @@ export const StatisticsAnalysis: React.FC = () => {
                         <td className="px-6 py-3 text-sm text-gray-500">{o.shipDate}</td>
                         <td className="px-6 py-3"><span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">收入</span></td>
                         <td className="px-6 py-3 text-sm text-gray-900">{o.customerName} - {o.productName}</td>
-                        <td className="px-6 py-3 text-sm text-right">{o.quantity} 吨</td>
-                        <td className="px-6 py-3 text-sm text-right font-medium text-green-600">+¥{(o.quantity * o.unitPrice).toLocaleString()}</td>
+                        <td className="px-6 py-3 text-sm text-right">{o.quantity} {o.unit || '吨'}</td>
+                        <td className="px-6 py-3 text-sm text-right font-medium text-green-600">+¥{(getTonValue(o.quantity, o.unit) * o.unitPrice).toLocaleString()}</td>
                      </tr>
                   ))}
                   {/* Purchase Rows */}
@@ -335,7 +339,7 @@ export const StatisticsAnalysis: React.FC = () => {
                         <td className="px-6 py-3 text-sm text-gray-500">{c.signDate}</td>
                         <td className="px-6 py-3"><span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">支出</span></td>
                         <td className="px-6 py-3 text-sm text-gray-900">{c.customerName} - {c.productName}</td>
-                        <td className="px-6 py-3 text-sm text-right">{c.quantity} 吨</td>
+                        <td className="px-6 py-3 text-sm text-right">{c.quantity} {c.unit || '吨'}</td>
                         <td className="px-6 py-3 text-sm text-right font-medium text-red-600">-¥{(c.amount || 0).toLocaleString()}</td>
                      </tr>
                   ))}

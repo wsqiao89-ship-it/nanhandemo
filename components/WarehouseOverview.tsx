@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Warehouse, StockRecord, ContractType } from '../types';
 import { MOCK_WAREHOUSES, MOCK_ORDERS, MOCK_CONTRACTS } from '../constants';
-import { Box, Search, Smartphone, X, ArrowUpCircle, ArrowDownCircle, RefreshCw, ClipboardCheck, ScanLine, List, Calendar, Filter, Printer, QrCode } from 'lucide-react';
+import { Box, Search, Smartphone, X, ArrowUpCircle, ArrowDownCircle, RefreshCw, ClipboardCheck, ScanLine, List, Calendar, Filter, Printer, QrCode, Send } from 'lucide-react';
 
 interface WarehouseOverviewProps {
   extraRecords?: StockRecord[];
@@ -17,11 +17,12 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
   // --- Filter State ---
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [recordTypeFilter, setRecordTypeFilter] = useState('all'); // New Type Filter
   
   // --- PDA State ---
   const [isPdaOpen, setIsPdaOpen] = useState(false);
-  const [pdaTab, setPdaTab] = useState<'ops' | 'inv' | 'rec'>('ops'); // New Tab State
-  const [pdaMode, setPdaMode] = useState<'gen' | 'in' | 'out' | 'transfer' | 'count' | null>(null);
+  const [pdaTab, setPdaTab] = useState<'ops' | 'inv' | 'rec'>('ops');
+  const [pdaMode, setPdaMode] = useState<'gen' | 'in' | 'out' | 'dispatch' | 'transfer' | 'count' | null>(null);
   
   const [pdaForm, setPdaForm] = useState({ 
       product: '湿法氟化铝', 
@@ -32,17 +33,20 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
       targetWarehouseId: '', 
       targetZoneId: '', 
       weight: '', 
+      inWeight: '', // for transfer
+      unit: '吨', 
       plate: '', 
       barcode: '', 
       batchNo: '', 
+      customer: '', // for code gen/display
       adjType: 'add', 
-      materialType: 'finished' 
+      materialType: 'finished' as 'finished' | 'semi'
   });
 
   // --- Data Logic ---
   const [localRecords, setLocalRecords] = useState<StockRecord[]>([]);
 
-  // Initialize records once on mount + merge with extraRecords
+  // Initialize records
   useEffect(() => {
     const derivedRecords: StockRecord[] = [];
     // 1. Outbound (Orders)
@@ -52,12 +56,15 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
               derivedRecords.push({
                  id: `${o.id}-v${idx}`,
                  date: v.exitTime || o.shipDate + ' 12:00',
-                 type: 'out',
+                 type: 'dispatch', // Logic update: Sales orders are dispatch
                  product: o.productName,
                  qty: v.actualOutWeight || v.loadWeight,
+                 unit: v.unit || '吨',
                  ref: o.id,
                  plate: v.plateNumber,
-                 materialType: 'finished'
+                 materialType: 'finished',
+                 operator: '王调度', // Mock
+                 confirmer: '系统'
               });
            }
         });
@@ -70,19 +77,22 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
              type: 'in',
              product: c.productName,
              qty: 35,
+             unit: c.unit || '吨',
              ref: c.contractNumber,
              plate: '-', 
-             materialType: 'semi' 
+             materialType: 'semi',
+             operator: '张采购',
+             confirmer: '李仓管'
          });
     });
     setLocalRecords([...derivedRecords, ...extraRecords].sort((a, b) => b.date.localeCompare(a.date)));
   }, [extraRecords]);
 
-  // Filter Logic for Main View
+  // Filter Logic for Main View Records Table
   const { displayedRecords, stats } = useMemo(() => {
      let recs = [...localRecords];
      
-     // 1. Warehouse Filter (Implicit logic: filter records related to products in that warehouse type)
+     // Warehouse context filter
      if (expandedWh) {
         const wh = warehouses.find(w => w.id === expandedWh);
         if (wh) {
@@ -95,25 +105,21 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
         }
      }
 
-     // 2. Search Term
-     if (searchTerm) {
-        recs = recs.filter(r => r.product.includes(searchTerm) || r.plate?.includes(searchTerm) || r.ref.includes(searchTerm));
+     if (searchTerm) recs = recs.filter(r => r.product.includes(searchTerm) || r.plate?.includes(searchTerm) || r.ref.includes(searchTerm) || r.operator?.includes(searchTerm));
+     if (dateRange.start) recs = recs.filter(r => r.date >= dateRange.start);
+     if (dateRange.end) recs = recs.filter(r => r.date <= dateRange.end + ' 23:59:59');
+     
+     if (recordTypeFilter !== 'all') {
+         recs = recs.filter(r => r.type === recordTypeFilter);
      }
 
-     // 3. Date Range
-     if (dateRange.start) {
-        recs = recs.filter(r => r.date >= dateRange.start);
-     }
-     if (dateRange.end) {
-        recs = recs.filter(r => r.date <= dateRange.end + ' 23:59:59');
-     }
-
-     const totalIn = recs.filter(r => r.type === 'in' || (r.type === 'adjust' && r.qty > 0)).reduce((acc, r) => acc + Math.abs(r.qty), 0);
-     const totalOut = recs.filter(r => r.type === 'out' || (r.type === 'adjust' && r.qty < 0)).reduce((acc, r) => acc + Math.abs(r.qty), 0);
+     const getTons = (r: StockRecord) => r.unit === 'kg' ? r.qty / 1000 : r.qty;
+     const totalIn = recs.filter(r => r.type === 'in' || (r.type === 'adjust' && r.qty > 0)).reduce((acc, r) => acc + Math.abs(getTons(r)), 0);
+     const totalOut = recs.filter(r => r.type === 'out' || r.type === 'dispatch' || (r.type === 'adjust' && r.qty < 0)).reduce((acc, r) => acc + Math.abs(getTons(r)), 0);
 
      recs.sort((a, b) => b.date.localeCompare(a.date));
      return { displayedRecords: recs, stats: { totalIn, totalOut } };
-  }, [expandedWh, localRecords, warehouses, searchTerm, dateRange]);
+  }, [expandedWh, localRecords, warehouses, searchTerm, dateRange, recordTypeFilter]);
 
   // --- PDA Handlers ---
 
@@ -122,26 +128,25 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
          ...prev, 
          warehouseId: '', zoneId: '', 
          targetWarehouseId: '', targetZoneId: '', 
-         weight: '', plate: '', barcode: '',
-         product: '湿法氟化铝',
+         weight: '', inWeight: '', unit: '吨', plate: '', barcode: '',
+         product: '湿法氟化铝', customer: '',
          materialType: 'finished'
      }));
   };
 
   const handleGenerateCode = () => {
-      // Mock generation logic
       const pCode = pdaForm.product === '湿法氟化铝' ? 'FHL' : pdaForm.product === '氧化铝' ? 'YHL' : 'GEN';
       const dStr = pdaForm.date.replace(/-/g, '').slice(2);
       const lStr = pdaForm.line === '1号产线' ? 'L1' : 'L2';
-      const tStr = pdaForm.materialType === 'finished' ? 'F' : 'S';
       const rnd = Math.floor(1000 + Math.random() * 9000);
       
-      const newCode = `${pCode}-${dStr}-${lStr}${tStr}-${rnd}`;
+      const newCode = `${pCode}-${dStr}-${lStr}-${rnd}`;
       setPdaForm(prev => ({ ...prev, barcode: newCode }));
   };
 
   const handlePrintCode = () => {
-      alert(`正在发送至打印机...\n\n条码: ${pdaForm.barcode}\n产品: ${pdaForm.product}\n产线: ${pdaForm.line}\n日期: ${pdaForm.date}`);
+      const custInfo = pdaForm.materialType === 'finished' && pdaForm.customer ? `\n客户: ${pdaForm.customer}` : '';
+      alert(`正在发送至打印机...\n\n条码: ${pdaForm.barcode}\n产品: ${pdaForm.product}${custInfo}\n产线: ${pdaForm.line}\n日期: ${pdaForm.date}`);
       resetPdaForm();
       setPdaMode(null);
   };
@@ -153,19 +158,27 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
      if (!weightVal && pdaMode !== 'gen') return alert('请输入数量');
 
      let newRecord: StockRecord | null = null;
+     const commonProps = { 
+         id: `pda-${Date.now()}`, date: now, unit: pdaForm.unit as any, 
+         operator: 'PDA用户', confirmer: '系统' 
+     };
 
      if (pdaMode === 'in') {
-         alert('PDA: 入库操作成功');
-         newRecord = { id: `pda-${Date.now()}`, date: now, type: 'in', product: '扫码入库品', qty: weightVal, ref: `PDA-${pdaForm.barcode || 'SCAN'}` };
+         alert(`入库成功\n批号:${pdaForm.barcode}`);
+         newRecord = { ...commonProps, type: 'in', product: '扫码入库品', qty: weightVal, ref: `PDA-${pdaForm.barcode || 'SCAN'}` };
      } else if (pdaMode === 'out') {
-         alert('PDA: 出库操作成功');
-         newRecord = { id: `pda-${Date.now()}`, date: now, type: 'out', product: '扫码出库品', qty: weightVal, ref: `PDA-${pdaForm.barcode || 'SCAN'}` };
+         alert('出库成功');
+         newRecord = { ...commonProps, type: 'out', product: '扫码出库品', qty: weightVal, ref: `PDA-OUT-${pdaForm.barcode || 'SCAN'}` };
+     } else if (pdaMode === 'dispatch') {
+         if (!pdaForm.plate) return alert('发货必须填写车牌号');
+         alert('发货装车成功');
+         newRecord = { ...commonProps, type: 'dispatch', product: '发货品', qty: weightVal, ref: `PDA-发货-${pdaForm.barcode}`, plate: pdaForm.plate };
      } else if (pdaMode === 'transfer') {
-         alert('PDA: 移库操作成功');
-         newRecord = { id: `pda-${Date.now()}`, date: now, type: 'transfer', product: '扫码移库品', qty: weightVal, ref: `PDA-${pdaForm.barcode || 'SCAN'}` };
+         alert('移库操作成功');
+         newRecord = { ...commonProps, type: 'transfer', product: '扫码移库品', qty: weightVal, ref: `PDA-调拨` };
      } else if (pdaMode === 'count') {
-         alert('PDA: 盘点数据提交成功');
-         newRecord = { id: `pda-${Date.now()}`, date: now, type: 'adjust', product: '盘点品', qty: weightVal, ref: `PDA-COUNT` };
+         alert('盘点数据提交成功');
+         newRecord = { ...commonProps, type: 'adjust', product: '盘点品', qty: weightVal, ref: `PDA-COUNT` };
      }
 
      if (newRecord) {
@@ -173,7 +186,7 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
      }
      
      resetPdaForm();
-     setPdaMode(null); // Return to menu
+     setPdaMode(null);
   };
 
   return (
@@ -263,6 +276,7 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
                                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">产品名称</th>
                                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">数量</th>
                                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">条码/批次</th>
+                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">客户 (如有)</th>
                                                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">操作</th>
                                             </tr>
                                         </thead>
@@ -272,6 +286,7 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
                                                     <td className="px-4 py-2 text-sm text-gray-900 font-medium">{item.productName}</td>
                                                     <td className="px-4 py-2 text-sm text-indigo-600 font-bold">{item.quantity} {item.unit}</td>
                                                     <td className="px-4 py-2 text-xs font-mono text-gray-500">{item.barcode}</td>
+                                                    <td className="px-4 py-2 text-xs text-gray-500">{item.customer || '-'}</td>
                                                     <td className="px-4 py-2 text-right">
                                                         <button className="text-blue-600 hover:text-blue-800 text-xs font-medium">详情</button>
                                                     </td>
@@ -317,20 +332,31 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
 
                         {/* Filter Toolbar */}
                         <div className="flex flex-wrap justify-between items-center mb-4 gap-4 bg-gray-50 p-2 rounded-lg border border-gray-100">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <div className="flex items-center px-2 gap-2 border-r border-gray-200 pr-3">
                                     <Calendar size={14} className="text-gray-400"/>
                                     <input type="date" className="bg-transparent text-sm text-gray-600 outline-none w-28" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})}/>
                                     <span className="text-gray-400">-</span>
                                     <input type="date" className="bg-transparent text-sm text-gray-600 outline-none w-28" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})}/>
                                 </div>
+                                <div className="flex items-center px-2 gap-2 border-r border-gray-200 pr-3">
+                                    <Filter size={14} className="text-gray-400"/>
+                                    <select className="bg-transparent text-sm text-gray-600 outline-none" value={recordTypeFilter} onChange={e => setRecordTypeFilter(e.target.value)}>
+                                        <option value="all">所有类型</option>
+                                        <option value="in">入库</option>
+                                        <option value="out">出库</option>
+                                        <option value="dispatch">发货</option>
+                                        <option value="transfer">调拨</option>
+                                        <option value="adjust">盘点</option>
+                                    </select>
+                                </div>
                                 <div className="flex items-center px-2 gap-2">
                                     <Search size={14} className="text-gray-400" />
-                                    <input type="text" placeholder="搜索产品、车牌、单号..." className="bg-transparent text-sm w-48 outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}/>
+                                    <input type="text" placeholder="搜索产品、车牌、操作人..." className="bg-transparent text-sm w-48 outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}/>
                                 </div>
                             </div>
                             <div className="flex gap-2 text-xs text-gray-500 self-center px-2">
-                                <Filter size={14}/> 显示 {displayedRecords.length} 条记录
+                                显示 {displayedRecords.length} 条记录
                             </div>
                         </div>
 
@@ -344,6 +370,7 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
                                         <th className="p-3 text-left text-xs font-medium text-gray-500">产品</th>
                                         <th className="p-3 text-left text-xs font-medium text-gray-500">数量</th>
                                         <th className="p-3 text-left text-xs font-medium text-gray-500">关联单号/摘要</th>
+                                        <th className="p-3 text-left text-xs font-medium text-gray-500">操作人 / 确认人</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-50">
@@ -354,18 +381,23 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
                                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                                                 r.type==='in'?'bg-green-100 text-green-700':
                                                 r.type==='out'?'bg-orange-100 text-orange-700':
+                                                r.type==='dispatch'?'bg-indigo-100 text-indigo-700':
                                                 r.type==='transfer'?'bg-blue-100 text-blue-700':'bg-purple-100 text-purple-700'
                                             }`}>
                                                 {r.type}
                                             </span>
                                         </td>
                                         <td className="p-3 text-sm text-gray-800">{r.product}</td>
-                                        <td className="p-3 text-sm font-bold text-gray-900">{r.qty}</td>
+                                        <td className="p-3 text-sm font-bold text-gray-900">{r.qty} <span className="text-xs font-normal text-gray-500">{r.unit || '吨'}</span></td>
                                         <td className="p-3 text-xs text-gray-500 max-w-[200px] truncate">{r.ref} {r.plate ? `(${r.plate})` : ''}</td>
+                                        <td className="p-3 text-xs text-gray-500">
+                                            {r.operator || '-'}<br/>
+                                            <span className="text-gray-400">{r.confirmer || '-'}</span>
+                                        </td>
                                     </tr>
                                 ))}
                                 {displayedRecords.length === 0 && (
-                                    <tr><td colSpan={5} className="p-8 text-center text-gray-400 text-sm">暂无符合条件的记录</td></tr>
+                                    <tr><td colSpan={6} className="p-8 text-center text-gray-400 text-sm">暂无符合条件的记录</td></tr>
                                 )}
                                 </tbody>
                             </table>
@@ -399,25 +431,29 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
                        {pdaMode === null ? (
                           // Main Operations Menu
                           <div className="grid grid-cols-2 gap-4">
-                             <button onClick={() => { setPdaMode('in'); resetPdaForm(); }} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-green-400 hover:shadow-md transition-all active:scale-95 flex flex-col items-center justify-center gap-2 h-28 group">
-                                <div className="w-12 h-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center group-hover:bg-green-600 group-hover:text-white transition-colors"><ArrowDownCircle size={24}/></div>
-                                <span className="font-bold text-gray-700">扫码入库</span>
+                             <button onClick={() => { setPdaMode('in'); resetPdaForm(); }} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-green-400 hover:shadow-md transition-all active:scale-95 flex flex-col items-center justify-center gap-2 h-24 group">
+                                <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center group-hover:bg-green-600 group-hover:text-white transition-colors"><ArrowDownCircle size={20}/></div>
+                                <span className="font-bold text-gray-700 text-sm">入库</span>
                              </button>
-                             <button onClick={() => { setPdaMode('out'); resetPdaForm(); }} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-orange-400 hover:shadow-md transition-all active:scale-95 flex flex-col items-center justify-center gap-2 h-28 group">
-                                <div className="w-12 h-12 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center group-hover:bg-orange-600 group-hover:text-white transition-colors"><ArrowUpCircle size={24}/></div>
-                                <span className="font-bold text-gray-700">扫码出库</span>
+                             <button onClick={() => { setPdaMode('out'); resetPdaForm(); }} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-orange-400 hover:shadow-md transition-all active:scale-95 flex flex-col items-center justify-center gap-2 h-24 group">
+                                <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center group-hover:bg-orange-600 group-hover:text-white transition-colors"><ArrowUpCircle size={20}/></div>
+                                <span className="font-bold text-gray-700 text-sm">出库</span>
                              </button>
-                             <button onClick={() => { setPdaMode('transfer'); resetPdaForm(); }} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all active:scale-95 flex flex-col items-center justify-center gap-2 h-28 group">
-                                <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors"><RefreshCw size={24}/></div>
-                                <span className="font-bold text-gray-700">移库调拨</span>
+                             <button onClick={() => { setPdaMode('dispatch'); resetPdaForm(); }} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-indigo-400 hover:shadow-md transition-all active:scale-95 flex flex-col items-center justify-center gap-2 h-24 group">
+                                <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors"><Send size={20}/></div>
+                                <span className="font-bold text-gray-700 text-sm">发货 (权限)</span>
                              </button>
-                             <button onClick={() => { setPdaMode('count'); resetPdaForm(); }} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-purple-400 hover:shadow-md transition-all active:scale-95 flex flex-col items-center justify-center gap-2 h-28 group">
-                                <div className="w-12 h-12 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors"><ClipboardCheck size={24}/></div>
-                                <span className="font-bold text-gray-700">库存盘点</span>
+                             <button onClick={() => { setPdaMode('transfer'); resetPdaForm(); }} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all active:scale-95 flex flex-col items-center justify-center gap-2 h-24 group">
+                                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors"><RefreshCw size={20}/></div>
+                                <span className="font-bold text-gray-700 text-sm">调仓</span>
                              </button>
-                             <button onClick={() => { setPdaMode('gen'); resetPdaForm(); }} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-slate-400 hover:shadow-md transition-all active:scale-95 flex flex-col items-center justify-center gap-2 h-28 col-span-2 group">
-                                <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center group-hover:bg-slate-600 group-hover:text-white transition-colors"><QrCode size={24}/></div>
-                                <span className="font-bold text-gray-700">条码生成</span>
+                             <button onClick={() => { setPdaMode('count'); resetPdaForm(); }} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-purple-400 hover:shadow-md transition-all active:scale-95 flex flex-col items-center justify-center gap-2 h-24 group">
+                                <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors"><ClipboardCheck size={20}/></div>
+                                <span className="font-bold text-gray-700 text-sm">盘点</span>
+                             </button>
+                             <button onClick={() => { setPdaMode('gen'); resetPdaForm(); }} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:border-slate-400 hover:shadow-md transition-all active:scale-95 flex flex-col items-center justify-center gap-2 h-24 group">
+                                <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center group-hover:bg-slate-600 group-hover:text-white transition-colors"><QrCode size={20}/></div>
+                                <span className="font-bold text-gray-700 text-sm">条码生成</span>
                              </button>
                           </div>
                        ) : (
@@ -426,87 +462,84 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
                              <div className="flex items-center gap-2 mb-4 pb-2 border-b">
                                 <button onClick={() => setPdaMode(null)} className="text-gray-400 hover:text-gray-600 text-sm">返回</button>
                                 <h3 className="font-bold text-gray-800 flex-1 text-center">
-                                   {pdaMode === 'in' ? '入库作业' : pdaMode === 'out' ? '出库作业' : pdaMode === 'transfer' ? '移库作业' : pdaMode === 'count' ? '盘点作业' : '生产赋码'}
+                                   {pdaMode === 'in' ? '入库作业' : pdaMode === 'out' ? '普通出库' : pdaMode === 'dispatch' ? '销售发货' : pdaMode === 'transfer' ? '移库调拨' : pdaMode === 'count' ? '盘点作业' : '条码生成'}
                                 </h3>
                                 <div className="w-8"></div>
                              </div>
                              
                              {pdaMode === 'gen' ? (
-                                // GENERATE CODE MODE UI
+                                // GENERATE CODE MODE
                                 <div className="space-y-4 flex-1">
-                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                                        <label className="block text-xs font-bold text-gray-500 mb-1">选择产品</label>
-                                        <select className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm mb-3"
-                                            value={pdaForm.product} onChange={e => setPdaForm({...pdaForm, product: e.target.value})}>
-                                            <option>湿法氟化铝</option>
-                                            <option>氧化铝</option>
-                                            <option>氢氧化铝</option>
-                                            <option>萤石</option>
-                                            <option>硫酸</option>
-                                        </select>
-
-                                        <label className="block text-xs font-bold text-gray-500 mb-1">产品类型</label>
-                                        <div className="flex gap-4 mb-3">
-                                            <label className="flex items-center gap-2">
-                                                <input type="radio" checked={pdaForm.materialType === 'finished'} onChange={() => setPdaForm({...pdaForm, materialType: 'finished'})} />
-                                                <span className="text-sm">成品</span>
-                                            </label>
-                                            <label className="flex items-center gap-2">
-                                                <input type="radio" checked={pdaForm.materialType === 'semi'} onChange={() => setPdaForm({...pdaForm, materialType: 'semi'})} />
-                                                <span className="text-sm">半成品</span>
-                                            </label>
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                                        <div><label className="text-xs text-gray-500">产品</label><select className="w-full bg-white border rounded p-2 text-sm" value={pdaForm.product} onChange={e => setPdaForm({...pdaForm, product: e.target.value})}><option>湿法氟化铝</option><option>氧化铝</option></select></div>
+                                        <div>
+                                            <label className="text-xs text-gray-500">类型</label>
+                                            <div className="flex gap-4 pt-1"><label><input type="radio" checked={pdaForm.materialType==='finished'} onChange={()=>setPdaForm({...pdaForm, materialType:'finished'})}/> 成品</label><label><input type="radio" checked={pdaForm.materialType==='semi'} onChange={()=>setPdaForm({...pdaForm, materialType:'semi'})}/> 半成品</label></div>
                                         </div>
-
-                                        <label className="block text-xs font-bold text-gray-500 mb-1">生产日期</label>
-                                        <input type="date" className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm mb-3"
-                                            value={pdaForm.date} onChange={e => setPdaForm({...pdaForm, date: e.target.value})} />
-
-                                        <label className="block text-xs font-bold text-gray-500 mb-1">生产线</label>
-                                        <select className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm"
-                                            value={pdaForm.line} onChange={e => setPdaForm({...pdaForm, line: e.target.value})}>
-                                            <option>1号产线</option>
-                                            <option>2号产线</option>
-                                            <option>3号产线</option>
-                                        </select>
+                                        {pdaForm.materialType === 'finished' && (
+                                            <div><label className="text-xs text-gray-500">客户名称 (可选)</label><input type="text" className="w-full bg-white border rounded p-2 text-sm" value={pdaForm.customer} onChange={e => setPdaForm({...pdaForm, customer: e.target.value})} /></div>
+                                        )}
+                                        <div><label className="text-xs text-gray-500">产线</label><select className="w-full bg-white border rounded p-2 text-sm" value={pdaForm.line} onChange={e => setPdaForm({...pdaForm, line: e.target.value})}><option>1号产线</option><option>2号产线</option></select></div>
                                     </div>
-
-                                    {pdaForm.barcode && (
-                                        <div className="bg-slate-800 p-4 rounded-xl text-white text-center shadow-lg">
-                                            <div className="text-xs text-slate-400 mb-1">生成的唯一编码</div>
-                                            <div className="text-xl font-mono font-bold tracking-wider">{pdaForm.barcode}</div>
-                                        </div>
-                                    )}
-
-                                    <button onClick={handleGenerateCode} className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-md mt-2 active:scale-95 transition-transform">
-                                        生成编码
-                                    </button>
-
-                                    {pdaForm.barcode && (
-                                        <button onClick={handlePrintCode} className="w-full bg-white border-2 border-slate-200 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-50 active:scale-95 transition-transform flex items-center justify-center gap-2">
-                                            <Printer size={18}/> 确认打印
-                                        </button>
-                                    )}
+                                    {pdaForm.barcode && <div className="bg-slate-800 p-3 rounded text-white text-center font-mono">{pdaForm.barcode}</div>}
+                                    <button onClick={handleGenerateCode} className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl">生成编码</button>
+                                    {pdaForm.barcode && <button onClick={handlePrintCode} className="w-full border-2 border-slate-200 py-3 rounded-xl font-bold text-slate-600">打印</button>}
                                 </div>
                              ) : (
-                                // STANDARD SCAN MODE UI
+                                // STANDARD SCAN MODE
                                 <div className="space-y-4 flex-1">
                                     <div>
-                                    <label className="text-xs text-gray-500 font-bold mb-1 block">条码扫描</label>
-                                    <div className="flex gap-2">
-                                        <input type="text" className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
-                                            placeholder="请扫描或输入条码" value={pdaForm.barcode} onChange={e => setPdaForm({...pdaForm, barcode: e.target.value})} autoFocus />
-                                        <button className="bg-slate-800 text-white p-2 rounded-lg"><ScanLine size={18}/></button>
-                                    </div>
+                                        <label className="text-xs text-gray-500 font-bold mb-1 block">批号扫码</label>
+                                        <div className="flex gap-2">
+                                            <input type="text" className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none" 
+                                                placeholder="请扫描或输入" value={pdaForm.barcode} onChange={e => setPdaForm({...pdaForm, barcode: e.target.value})} autoFocus />
+                                            <button className="bg-slate-800 text-white p-2 rounded-lg"><ScanLine size={18}/></button>
+                                        </div>
                                     </div>
                                     
-                                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 text-sm text-blue-800">
-                                    {pdaForm.barcode ? `已识别: ${pdaForm.product} (模拟)` : '等待扫描...'}
+                                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 text-sm">
+                                        <div className="text-blue-800 font-bold">{pdaForm.barcode ? (pdaForm.product + (pdaForm.customer ? ` (${pdaForm.customer})` : '')) : '等待扫描...'}</div>
+                                        {pdaForm.barcode && <div className="text-xs text-blue-500 mt-1">当前仓库信息: 1号库-A区 (模拟)</div>}
                                     </div>
 
+                                    {pdaMode === 'in' && (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <select className="border rounded p-2 text-sm"><option>选择仓库</option></select>
+                                            <select className="border rounded p-2 text-sm"><option>选择区域</option></select>
+                                        </div>
+                                    )}
+
+                                    {pdaMode === 'transfer' && (
+                                        <div className="space-y-2 border-t pt-2">
+                                            <div className="text-xs font-bold">目标位置</div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <select className="border rounded p-2 text-sm"><option>目标仓库</option></select>
+                                                <select className="border rounded p-2 text-sm"><option>目标区域</option></select>
+                                            </div>
+                                            <div className="flex">
+                                                <input type="number" placeholder="入库重量" className="w-full border rounded-l p-2 text-sm" value={pdaForm.inWeight} onChange={e=>setPdaForm({...pdaForm, inWeight:e.target.value})}/>
+                                                <div className="bg-gray-100 border border-l-0 px-2 flex items-center text-xs">{pdaForm.unit}</div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {pdaMode === 'dispatch' && (
+                                        <div>
+                                            <label className="text-xs text-red-500 font-bold mb-1 block">车牌号 (必填)</label>
+                                            <input type="text" className="w-full border-red-300 border rounded p-2 text-sm bg-red-50" placeholder="请输入车牌" value={pdaForm.plate} onChange={e=>setPdaForm({...pdaForm, plate:e.target.value})} />
+                                        </div>
+                                    )}
+
                                     <div>
-                                    <label className="text-xs text-gray-500 font-bold mb-1 block">数量/重量</label>
-                                    <input type="number" className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-lg font-bold outline-none focus:border-blue-500" 
-                                        placeholder="0.00" value={pdaForm.weight} onChange={e => setPdaForm({...pdaForm, weight: e.target.value})} />
+                                        <label className="text-xs text-gray-500 font-bold mb-1 block">{pdaMode === 'transfer' ? '出库重量' : '数量/重量'}</label>
+                                        <div className="flex">
+                                            <input type="number" className="w-full bg-white border border-r-0 border-gray-300 rounded-l-lg px-3 py-2 text-lg font-bold outline-none" 
+                                                placeholder="0.00" value={pdaForm.weight} onChange={e => setPdaForm({...pdaForm, weight: e.target.value})} />
+                                            <select value={pdaForm.unit} onChange={e => setPdaForm({...pdaForm, unit: e.target.value})} className="bg-gray-100 border border-gray-300 border-l-0 rounded-r-lg px-2 font-bold text-gray-700 outline-none">
+                                                <option value="吨">吨</option>
+                                                <option value="kg">kg</option>
+                                            </select>
+                                        </div>
                                     </div>
 
                                     <button onClick={handlePdaSubmit} className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg mt-4 active:scale-95 transition-transform">
@@ -542,7 +575,10 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
                                       </div>
                                       {z.inventory.map(i => (
                                          <div key={i.id} className="flex justify-between items-center text-sm py-1 pl-2 border-l-2 border-indigo-100">
-                                            <span className="text-gray-800">{i.productName}</span>
+                                            <div className="flex flex-col">
+                                                <span className="text-gray-800">{i.productName}</span>
+                                                {i.customer && <span className="text-[10px] text-gray-400">客: {i.customer}</span>}
+                                            </div>
                                             <span className="font-mono font-bold text-blue-600">{i.quantity}{i.unit}</span>
                                          </div>
                                       ))}
@@ -557,7 +593,7 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
                  {/* TAB 3: RECORDS (Compact List) */}
                  {pdaTab === 'rec' && (
                     <div className="p-4 space-y-3">
-                       <h3 className="text-xs font-bold text-gray-400 uppercase ml-1 mb-2">最近操作记录 (Local)</h3>
+                       <h3 className="text-xs font-bold text-gray-400 uppercase ml-1 mb-2">最近操作记录</h3>
                        {localRecords.length === 0 ? (
                           <div className="text-center text-gray-400 py-10 text-sm">暂无操作记录</div>
                        ) : (
@@ -565,9 +601,9 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
                              <div key={r.id} className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white ${
-                                      r.type==='in'?'bg-green-500': r.type==='out'?'bg-orange-500': 'bg-blue-500'
+                                      r.type==='in'?'bg-green-500': r.type==='out'?'bg-orange-500': r.type==='dispatch'?'bg-indigo-500': 'bg-blue-500'
                                    }`}>
-                                      {r.type==='in'?<ArrowDownCircle size={14}/>:r.type==='out'?<ArrowUpCircle size={14}/>:<RefreshCw size={14}/>}
+                                      {r.type==='in'?<ArrowDownCircle size={14}/>:r.type==='out'?<ArrowUpCircle size={14}/>:r.type==='dispatch'?<Send size={14}/>:<RefreshCw size={14}/>}
                                    </div>
                                    <div>
                                       <div className="text-sm font-bold text-gray-800">{r.product}</div>
@@ -575,7 +611,7 @@ export const WarehouseOverview: React.FC<WarehouseOverviewProps> = ({ extraRecor
                                    </div>
                                 </div>
                                 <div className="text-right">
-                                   <div className="text-sm font-bold text-gray-700">{r.qty}t</div>
+                                   <div className="text-sm font-bold text-gray-700">{r.qty}{r.unit || '吨'}</div>
                                    <div className="text-[10px] text-gray-400">{r.date.split(' ')[1] || r.date}</div>
                                 </div>
                              </div>

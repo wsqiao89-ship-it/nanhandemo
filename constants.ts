@@ -8,12 +8,12 @@ const generateHistory = (status: string) => [
 
 // Master List of Vehicles (Vehicle Pool)
 export const MOCK_VEHICLE_POOL: VehicleMaster[] = [
-  { id: 'v1', plateNumber: '鲁C88888', driverName: '张建国', driverPhone: '13800138000' },
-  { id: 'v2', plateNumber: '鲁C66666', driverName: '李富贵', driverPhone: '13900139000' },
-  { id: 'v3', plateNumber: '鲁Q12345', driverName: '王铁柱', driverPhone: '13700137000' },
-  { id: 'v4', plateNumber: '冀B99999', driverName: '赵大力', driverPhone: '15000000000' },
-  { id: 'v5', plateNumber: '豫K56789', driverName: '孙保国', driverPhone: '15100000000' },
-  { id: 'v6', plateNumber: '苏G55555', driverName: '周发财', driverPhone: '15200000000' },
+  { id: 'v1', plateNumber: '鲁C88888', driverName: '张建国', driverPhone: '13800138000', emissions: '国V' },
+  { id: 'v2', plateNumber: '鲁C66666', driverName: '李富贵', driverPhone: '13900139000', emissions: '国VI' },
+  { id: 'v3', plateNumber: '鲁Q12345', driverName: '王铁柱', driverPhone: '13700137000', emissions: '新能源' },
+  { id: 'v4', plateNumber: '冀B99999', driverName: '赵大力', driverPhone: '15000000000', emissions: '国V' },
+  { id: 'v5', plateNumber: '豫K56789', driverName: '孙保国', driverPhone: '15100000000', emissions: '国VI' },
+  { id: 'v6', plateNumber: '苏G55555', driverName: '周发财', driverPhone: '15200000000', emissions: '国V' },
 ];
 
 export const MOCK_CONTRACTS: Contract[] = [
@@ -95,8 +95,29 @@ export const MOCK_ORDERS: Order[] = [
     unitPrice: 3200,
     shipDate: '2023-10-29',
     status: OrderStatus.PendingAudit,
+    remark: '加急订单，请优先处理',
     vehicles: [],
     history: [{ date: '2023-10-29 08:30', action: '创建订单', user: '销售部-赵云' }],
+  },
+  {
+    id: 'ORD-20231029-PRICE',
+    type: 'sales',
+    contractId: 'CON-PRICE-001',
+    customerName: '滨化集团',
+    productName: '氟化铝',
+    category: 'main',
+    spec: '散装',
+    quantity: 300,
+    unitPrice: 6200,
+    shipDate: '2023-10-30',
+    status: OrderStatus.PriceApproval,
+    remark: '申请调价至6200',
+    isPriceAdjusted: true,
+    vehicles: [],
+    history: [
+        { date: '2023-10-29 08:30', action: '创建订单', user: '销售部-赵云' },
+        { date: '2023-10-29 09:00', action: '发起调价审批: 6000->6200', user: '销售部-赵云' }
+    ],
   },
   {
     id: 'ORD-20231027-001',
@@ -110,6 +131,7 @@ export const MOCK_ORDERS: Order[] = [
     unitPrice: 6500,
     shipDate: '2023-10-27',
     status: OrderStatus.ReadyToShip,
+    isPriceAdjusted: true, // Mock price adjustment
     vehicles: [
       { id: 'rec-1', plateNumber: '鲁C88888', driverName: '张建国', driverPhone: '13800138000', loadWeight: 32, status: VehicleStatus.PendingEntry, type: RecordType.Normal },
       { id: 'rec-2', plateNumber: '鲁C66666', driverName: '李富贵', driverPhone: '13900139000', loadWeight: 33, status: VehicleStatus.PendingEntry, type: RecordType.Normal }
@@ -129,7 +151,7 @@ export const MOCK_ORDERS: Order[] = [
     shipDate: '2023-10-27',
     status: OrderStatus.Shipping,
     vehicles: [
-      { id: 'rec-3-finished', plateNumber: '苏G55555', driverName: '周发财', driverPhone: '15200000000', loadWeight: 32, status: VehicleStatus.Exited, entryTime: '2023-10-27 07:00', weighing1: { time: '07:10', weight: 15.2 }, weighing2: { time: '08:40', weight: 47.2 }, exitTime: '2023-10-27 08:50', actualOutWeight: 32.0, type: RecordType.Normal },
+      { id: 'rec-3-finished', plateNumber: '苏G55555', driverName: '周发财', driverPhone: '15200000000', loadWeight: 32, status: VehicleStatus.Exited, entryTime: '2023-10-27 07:00', weighing1: { time: '07:10', weight: 15.2 }, weighing2: { time: '08:40', weight: 47.2 }, exitTime: '2023-10-27 08:50', actualOutWeight: 32.0, type: RecordType.Normal, warehouseName: 'F-01', batchNumber: 'FHL-20231027-0001' },
       { id: 'rec-3', plateNumber: '鲁Q12345', driverName: '王铁柱', driverPhone: '13700137000', loadWeight: 30, status: VehicleStatus.Loading, entryTime: '2023-10-27 08:05', weighing1: { time: '08:15', weight: 15.5 }, type: RecordType.Normal },
       { id: 'rec-4', plateNumber: '冀B99999', driverName: '赵大力', driverPhone: '15000000000', loadWeight: 30, status: VehicleStatus.PendingEntry, type: RecordType.Normal }
     ],
@@ -181,12 +203,13 @@ export const MOCK_ORDERS: Order[] = [
     quantity: 200,
     unitPrice: 2800,
     shipDate: '2023-10-24',
-    status: OrderStatus.Completed,
+    status: OrderStatus.Invoiced,
+    settlementWeight: 200.05,
     vehicles: [
       { id: 'rec-7', plateNumber: '鲁C88888', driverName: '张建国', driverPhone: '13800138000', loadWeight: 32, status: VehicleStatus.Exited, entryTime: '2023-10-24 07:50', weighing1: { time: '08:00', weight: 15.0 }, weighing2: { time: '09:30', weight: 47.0 }, exitTime: '2023-10-24 09:45', actualOutWeight: 32.0, type: RecordType.Normal, warehouseName: '1号原料库' },
       { id: 'rec-8', plateNumber: '鲁C66666', driverName: '李富贵', driverPhone: '13900139000', loadWeight: 32, status: VehicleStatus.Exited, entryTime: '2023-10-24 09:50', weighing1: { time: '10:00', weight: 15.2 }, weighing2: { time: '11:30', weight: 47.2 }, exitTime: '2023-10-24 11:45', actualOutWeight: 32.0, type: RecordType.Normal, warehouseName: '1号原料库' }
     ],
-    history: generateHistory(OrderStatus.Completed),
+    history: generateHistory(OrderStatus.Invoiced),
   },
   {
     id: 'ORD-20231028-006',
@@ -199,9 +222,9 @@ export const MOCK_ORDERS: Order[] = [
     quantity: 100,
     unitPrice: 5800,
     shipDate: '2023-10-28',
-    status: OrderStatus.PriceApproval,
+    status: OrderStatus.PendingAudit,
     vehicles: [],
-    history: generateHistory(OrderStatus.PriceApproval),
+    history: generateHistory(OrderStatus.PendingAudit),
   },
   {
     id: 'ORD-20231028-007',
@@ -246,11 +269,11 @@ export const MOCK_ORDERS: Order[] = [
     quantity: 200,
     unitPrice: 20,
     shipDate: '2023-10-29',
-    status: OrderStatus.Completed,
+    status: OrderStatus.Auditing, // Changed to Auditing for by-product flow
     vehicles: [
        { id: 'rec-sync-2', plateNumber: '豫K56789', driverName: '孙保国', driverPhone: '15100000000', loadWeight: 20, status: VehicleStatus.Exited, actualOutWeight: 19.8, type: RecordType.Normal, entryTime: '2023-10-29 10:00', exitTime: '2023-10-29 11:30' }
     ],
-    history: generateHistory(OrderStatus.Completed),
+    history: generateHistory(OrderStatus.Auditing),
   },
 
   // --- PURCHASE ORDERS ---

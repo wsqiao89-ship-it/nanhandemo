@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Search, Plus, Filter, FileText, Edit, Trash2, Paperclip, Calendar, User, ArrowRight, Package } from 'lucide-react';
 import { Contract, ContractStatus, ContractType } from '../types';
@@ -31,6 +32,7 @@ export const ContractManagement: React.FC<ContractManagementProps> = ({ onGenera
     productName: '',
     spec: '',
     quantity: '',
+    unit: '吨', // Added unit
     deliveryTime: '',
     type: ContractType.Sales,
     attachment: ''
@@ -38,9 +40,9 @@ export const ContractManagement: React.FC<ContractManagementProps> = ({ onGenera
   const [formData, setFormData] = useState(initialForm);
 
   // --- Helpers ---
-  const generateContractName = (customer: string, quantity: string | number, date: string) => {
+  const generateContractName = (customer: string, quantity: string | number, unit: string, date: string) => {
     if (!customer) return '';
-    return `${customer}${quantity ? ` ${quantity}吨` : ''}|${date ? ` ${date}` : ''}`;
+    return `${customer}${quantity ? ` ${quantity}${unit}` : ''}|${date ? ` ${date}` : ''}`;
   };
 
   const currentUser = 'Admin User'; // Mock current user
@@ -56,6 +58,7 @@ export const ContractManagement: React.FC<ContractManagementProps> = ({ onGenera
         productName: contract.productName,
         spec: contract.spec,
         quantity: contract.quantity.toString(),
+        unit: contract.unit || '吨',
         deliveryTime: contract.deliveryTime,
         type: contract.type,
         attachment: contract.attachment || ''
@@ -75,7 +78,7 @@ export const ContractManagement: React.FC<ContractManagementProps> = ({ onGenera
   const handleSave = () => {
     if (!formData.contractNumber || !formData.customerName) return alert('请填写必填项');
 
-    const name = generateContractName(formData.customerName, formData.quantity, formData.signDate);
+    const name = generateContractName(formData.customerName, formData.quantity, formData.unit, formData.signDate);
     const quantityNum = parseFloat(formData.quantity) || 0;
 
     if (editingContract) {
@@ -83,6 +86,7 @@ export const ContractManagement: React.FC<ContractManagementProps> = ({ onGenera
         ...c,
         ...formData,
         quantity: quantityNum,
+        unit: formData.unit as any,
         name
       } : c));
     } else {
@@ -90,6 +94,7 @@ export const ContractManagement: React.FC<ContractManagementProps> = ({ onGenera
         id: `con-${Date.now()}`,
         ...formData,
         quantity: quantityNum,
+        unit: formData.unit as any,
         status: ContractStatus.New,
         owner: currentUser,
         name
@@ -210,7 +215,7 @@ export const ContractManagement: React.FC<ContractManagementProps> = ({ onGenera
                        <div className="text-xs text-gray-500 bg-gray-100 inline-block px-1.5 rounded mt-0.5">{c.spec}</div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                       <div className="text-sm font-bold text-gray-900">{c.quantity} T</div>
+                       <div className="text-sm font-bold text-gray-900">{c.quantity} {c.unit || '吨'}</div>
                        <div className="text-xs text-gray-500">交: {c.deliveryTime}</div>
                     </td>
                     <td className="px-6 py-4">
@@ -315,9 +320,15 @@ export const ContractManagement: React.FC<ContractManagementProps> = ({ onGenera
                                value={formData.spec} onChange={e => setFormData({...formData, spec: e.target.value})} />
                          </div>
                          <div>
-                            <label className="block text-sm font-medium text-gray-700">数量 (吨)</label>
-                            <input type="number" className="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm" 
-                               value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} />
+                            <label className="block text-sm font-medium text-gray-700">数量</label>
+                            <div className="flex mt-1">
+                                <input type="number" className="block w-full border border-gray-300 rounded-l-md p-2 text-sm" 
+                                value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} />
+                                <select value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} className="border border-l-0 border-gray-300 rounded-r-md bg-gray-50 px-2 text-sm text-gray-700 outline-none">
+                                    <option value="吨">吨</option>
+                                    <option value="kg">kg</option>
+                                </select>
+                            </div>
                          </div>
                          <div>
                             <label className="block text-sm font-medium text-gray-700">交付时间</label>

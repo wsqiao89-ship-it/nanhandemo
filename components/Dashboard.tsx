@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { 
   TrendingUp, 
@@ -11,6 +12,12 @@ import {
   ShoppingBag,
   DollarSign,
   ChevronRight,
+  LayoutGrid,     
+  ClipboardCheck, 
+  Camera,         
+  Calendar,       
+  Wrench,
+  ExternalLink          
 } from 'lucide-react';
 import { Order, OrderStatus, Contract, Warehouse, ContractType, VehicleStatus, RecordType } from '../types';
 
@@ -29,12 +36,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigate,
 }) => {
 
+  // --- Helpers ---
+  const getTonValue = (val: number, unit?: string) => unit === 'kg' ? val / 1000 : val;
+
   // --- Calculations ---
 
   // 1. Personal Tasks (To-Do)
   const pendingAudits = orders.filter(o => o.status === OrderStatus.PendingAudit);
-  const pendingPrices = orders.filter(o => o.status === OrderStatus.PriceApproval);
-  const tasksCount = pendingAudits.length + pendingPrices.length;
+  const tasksCount = pendingAudits.length;
 
   // 2. Shipping Logistics Stats (Sales Orders)
   const shippingStats = useMemo(() => {
@@ -45,13 +54,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
      ));
      
      const totalTrucks = activeVehicleRecords.length;
-     const totalTons = activeVehicleRecords.reduce((acc, v) => acc + (v.actualOutWeight || v.loadWeight), 0);
+     const totalTons = activeVehicleRecords.reduce((acc, v) => acc + getTonValue(v.actualOutWeight || v.loadWeight, v.unit), 0);
      
      // Group by product
      const productBreakdown = activeVehicleRecords.reduce((acc, v) => {
         const order = orders.find(o => o.vehicles.some(vr => vr.id === v.id));
         if (order) {
-           acc[order.productName] = (acc[order.productName] || 0) + (v.actualOutWeight || v.loadWeight);
+           acc[order.productName] = (acc[order.productName] || 0) + getTonValue(v.actualOutWeight || v.loadWeight, v.unit);
         }
         return acc;
      }, {} as Record<string, number>);
@@ -62,7 +71,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // 3. Purchasing Stats (Contracts) - REMOVED AMOUNT
   const purchasingStats = useMemo(() => {
      const purchaseContracts = contracts.filter(c => c.type === ContractType.Purchase);
-     const totalTons = purchaseContracts.reduce((acc, c) => acc + c.quantity, 0);
+     const totalTons = purchaseContracts.reduce((acc, c) => acc + getTonValue(c.quantity, c.unit), 0);
      
      return { totalTons, count: purchaseContracts.length };
   }, [contracts]);
@@ -70,7 +79,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // 4. Inventory
   const totalInventory = useMemo(() => {
     return warehouses.reduce((acc, wh) => {
-      return acc + wh.zones.reduce((zAcc, z) => zAcc + z.inventory.reduce((iAcc, i) => iAcc + i.quantity, 0), 0);
+      return acc + wh.zones.reduce((zAcc, z) => zAcc + z.inventory.reduce((iAcc, i) => iAcc + (i.unit === 'kg' ? i.quantity / 1000 : i.quantity), 0), 0);
     }, 0);
   }, [warehouses]);
 
@@ -103,11 +112,67 @@ export const Dashboard: React.FC<DashboardProps> = ({
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
       
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">工作台</h1>
           <p className="text-gray-500 text-sm mt-1">欢迎回来，Admin User。今日共有 <span className="text-blue-600 font-bold">{tasksCount}</span> 项待办事项需处理。</p>
         </div>
+      </div>
+
+      {/* 0. External Systems Quick Access (Top Position) */}
+      <div className="mb-8">
+         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <LayoutGrid size={14}/> 关联系统直达
+         </h3>
+         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* 6S */}
+            <button onClick={() => alert('即将跳转: 6S巡检系统')} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex items-center gap-4 group">
+               <div className="p-3 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <ClipboardCheck size={24} />
+               </div>
+               <div className="text-left flex-1 min-w-0">
+                  <div className="font-bold text-gray-800 group-hover:text-blue-700 truncate">6S巡检系统</div>
+                  <div className="text-xs text-gray-500 truncate">安全与环境数字化检查</div>
+               </div>
+               <ExternalLink size={14} className="text-gray-300 group-hover:text-blue-400" />
+            </button>
+
+            {/* Vehicle */}
+            <button onClick={() => alert('即将跳转: 车辆识别系统')} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-purple-300 transition-all flex items-center gap-4 group">
+               <div className="p-3 bg-purple-50 text-purple-600 rounded-lg group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                  <Camera size={24} />
+               </div>
+               <div className="text-left flex-1 min-w-0">
+                  <div className="font-bold text-gray-800 group-hover:text-purple-700 truncate">车辆识别系统</div>
+                  <div className="text-xs text-gray-500 truncate">门岗自动抓拍与抬杆</div>
+               </div>
+               <ExternalLink size={14} className="text-gray-300 group-hover:text-purple-400" />
+            </button>
+
+            {/* Weighbridge */}
+            <button onClick={() => alert('即将跳转: 磅房预约系统')} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-orange-300 transition-all flex items-center gap-4 group">
+               <div className="p-3 bg-orange-50 text-orange-600 rounded-lg group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                  <Calendar size={24} />
+               </div>
+               <div className="text-left flex-1 min-w-0">
+                  <div className="font-bold text-gray-800 group-hover:text-orange-700 truncate">磅房预约系统</div>
+                  <div className="text-xs text-gray-500 truncate">车辆过磅排队管理</div>
+               </div>
+               <ExternalLink size={14} className="text-gray-300 group-hover:text-orange-400" />
+            </button>
+
+            {/* Spare Parts */}
+            <button onClick={() => alert('即将跳转: 备件仓库系统')} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-green-300 transition-all flex items-center gap-4 group">
+               <div className="p-3 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-colors">
+                  <Wrench size={24} />
+               </div>
+               <div className="text-left flex-1 min-w-0">
+                  <div className="font-bold text-gray-800 group-hover:text-green-700 truncate">备件仓库系统</div>
+                  <div className="text-xs text-gray-500 truncate">备品备件领用与盘点</div>
+               </div>
+               <ExternalLink size={14} className="text-gray-300 group-hover:text-green-400" />
+            </button>
+         </div>
       </div>
 
       {/* 1. Overview Cards */}
@@ -130,7 +195,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         />
         <StatCard 
           title="当前总库存" 
-          value={`${totalInventory} 吨`} 
+          value={`${totalInventory.toFixed(1)} 吨`} 
           subValue={<span className="text-gray-500">分布于 {warehouses.length} 个仓库</span>}
           icon={Database} 
           colorClass="text-indigo-600" 
@@ -161,7 +226,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                  </div>
                  <div className="space-y-3">
-                    <div className="text-xs font-semibold text-gray-400 uppercase">产品分布</div>
+                    <div className="text-xs font-semibold text-gray-400 uppercase">产品分布 (吨)</div>
                     {Object.entries(shippingStats.productBreakdown).map(([name, weight]: [string, number]) => (
                        <div key={name} className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">{name}</span>
@@ -180,7 +245,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                  <div className="flex items-center justify-between mb-6">
                     <div>
                        <div className="text-sm text-gray-500">本月采购总量</div>
-                       <div className="text-2xl font-bold text-gray-900">{purchasingStats.totalTons} <span className="text-sm font-normal text-gray-400">吨</span></div>
+                       <div className="text-2xl font-bold text-gray-900">{purchasingStats.totalTons.toFixed(1)} <span className="text-sm font-normal text-gray-400">吨</span></div>
                     </div>
                     <div className="text-right">
                        <div className="text-sm text-gray-500">采购合同数</div>
@@ -196,7 +261,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                              <span className="text-[10px] text-gray-400">{c.customerName}</span>
                           </div>
                           <div className="text-right">
-                             <div className="font-medium">{c.quantity} 吨</div>
+                             <div className="font-medium">{c.quantity} {c.unit || '吨'}</div>
                              <div className="text-[10px] text-gray-400">{c.signDate}</div>
                           </div>
                        </div>
@@ -228,27 +293,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               </div>
                               <div>
                                  <h4 className="text-sm font-bold text-gray-800">订单财务审核</h4>
-                                 <p className="text-xs text-gray-500 mt-0.5">{task.customerName} - {task.productName} {task.quantity}吨</p>
+                                 <p className="text-xs text-gray-500 mt-0.5">{task.customerName} - {task.productName} {task.quantity}{task.unit||'吨'}</p>
                               </div>
                            </div>
                            <button onClick={() => onNavigate('approvals')} className="px-3 py-1.5 border border-purple-200 text-purple-600 text-xs rounded hover:bg-purple-50">
                               去审核
-                           </button>
-                        </div>
-                      ))}
-                      {pendingPrices.map(task => (
-                        <div key={task.id} className="p-4 hover:bg-gray-50 flex items-center justify-between transition-colors">
-                           <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center flex-shrink-0">
-                                 <DollarSign size={18} />
-                              </div>
-                              <div>
-                                 <h4 className="text-sm font-bold text-gray-800">特殊价格审批</h4>
-                                 <p className="text-xs text-gray-500 mt-0.5">{task.customerName} - 申请调价</p>
-                              </div>
-                           </div>
-                           <button onClick={() => onNavigate('approvals')} className="px-3 py-1.5 border border-yellow-200 text-yellow-600 text-xs rounded hover:bg-yellow-50">
-                              去批准
                            </button>
                         </div>
                       ))}

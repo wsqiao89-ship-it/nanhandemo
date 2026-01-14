@@ -1,15 +1,17 @@
 
 export enum OrderStatus {
-  PendingAudit = '待审核', // New: Requires financial audit
-  PriceApproval = '调价审批中',
+  PendingAudit = '待审核', 
+  PriceApproval = '调价审批中', // Restored
   Unassigned = '未分配车辆',
-  ReadyToShip = '待发货', // Assigned vehicles
-  Shipping = '发货中', // Vehicle entered
-  Receiving = '收货中', // Purchase: Vehicle entered/Unloading
+  ReadyToShip = '待发货', 
+  Shipping = '发货中', 
+  Receiving = '收货中', 
   Completed = '已完成',
-  Stored = '已入库', // Purchase: Completed/Put away
+  Stored = '已入库', 
   Returning = '退货中',
   Exchanging = '换货中',
+  Auditing = '审核中', // New: For By-products or general checks
+  Invoiced = '已开票', // New: Final financial state
   Returned = '已退货',
   Exchanged = '已换货',
 }
@@ -50,6 +52,7 @@ export interface VehicleMaster {
   plateNumber: string;
   driverName: string;
   driverPhone: string;
+  emissions?: string; // New: Emission Standard (e.g. 国V, 国VI)
 }
 
 export interface VehicleRecord {
@@ -61,11 +64,21 @@ export interface VehicleRecord {
   
   // Planned/Dispatch Info
   loadWeight: number; // Planned weight
+  unit?: '吨' | 'kg'; // Unit for weights
+  emissions?: string; // Snapshot of emission when recorded
   
   // Source/Inventory Info (New)
   warehouseName?: string;
   zoneName?: string;
-  batchNumber?: string; // Product Code / Batch Barcode
+  
+  // Legacy single batch field (optional now)
+  batchNumber?: string; 
+  
+  // New: Multiple Batches Support
+  batchDetails?: { 
+    batchNo: string; 
+    weight: number; 
+  }[];
 
   // Tracking Info (Lifecycle Timestamps)
   entryTime?: string;     // 进场时间
@@ -80,6 +93,15 @@ export interface VehicleRecord {
   returnWeight?: number;
   exchangeReason?: string;
   
+  // Advanced Workflow Confirmations (Parallel Steps)
+  confirmations?: {
+    marketing?: boolean; // 市场部确认
+    warehouse?: boolean; // 仓管员确认
+    gate?: boolean;      // 门卫确认 (New)
+    lab?: boolean;       // 实验室化验 (For specific flows)
+  };
+  labData?: string;      // 化验数据/报告链接
+  
   type: RecordType;
 }
 
@@ -92,11 +114,18 @@ export interface Order {
   category: 'main' | 'byproduct'; // Sales: Main/Byproduct
   spec: string;
   quantity: number; // Tons
+  unit?: '吨' | 'kg'; // Unit for quantity
   unitPrice: number;
   shipDate: string;
   status: OrderStatus;
   vehicles: VehicleRecord[];
   history: { date: string; action: string; user: string }[];
+  
+  // New Fields
+  remark?: string;          // 订单备注
+  isPriceAdjusted?: boolean; // 是否已调价
+  pendingPrice?: number;     // 待审批的新价格
+  settlementWeight?: number; // 结算重量 (For Invoicing)
 }
 
 export interface Contract {
@@ -108,6 +137,7 @@ export interface Contract {
   productName: string;
   spec: string;
   quantity: number;
+  unit?: '吨' | 'kg'; // Unit for quantity
   amount?: number; // Total Contract Value (Cost or Revenue)
   deliveryTime: string;
   status: ContractStatus;
@@ -124,6 +154,7 @@ export interface FilterState {
   status: OrderStatus | '';
   plateNumber: string; // New filter
   productType: string; // New filter
+  isPriceAdjusted: string; // 'true' | 'false' | ''
 }
 
 // --- New Types for Modules ---
@@ -150,6 +181,7 @@ export interface InventoryItem {
   unit: string;
   productCode: string; // Derived from rule
   barcode: string; // Same as code
+  customer?: string; // Optional customer name for finished goods
 }
 
 export interface WarehouseZone {
@@ -169,12 +201,16 @@ export interface Warehouse {
 export interface StockRecord {
   id: string;
   date: string;
-  type: 'in' | 'out' | 'transfer' | 'adjust';
+  type: 'in' | 'out' | 'transfer' | 'adjust' | 'dispatch'; // Added dispatch
   product: string;
   qty: number;
+  unit?: '吨' | 'kg';
   ref: string; // Order ID or Contract ID
   plate?: string;
   materialType?: 'finished' | 'semi';
+  customer?: string; // Added customer for audit view
+  operator?: string;
+  confirmer?: string;
 }
 
 // --- Production Coding ---
